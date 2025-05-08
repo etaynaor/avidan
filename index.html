@@ -175,7 +175,8 @@
             z-index: 3; /* Above stars and overlay */
         }
 
-        .avidan-illustration-stylized:hover {
+        .avidan-illustration-stylized:hover,
+        .avidan-illustration-stylized.js-touch-active { /* Added touch class */
             transform: scale(1.05) translateY(-5px);
             filter: /* Intense static hover filter */
                 grayscale(100%)
@@ -187,7 +188,7 @@
                 drop-shadow(0 0 15px var(--neon-blue))
                 drop-shadow(0 0 35px var(--neon-blue-transparent-heavy));
             opacity: 1;
-            animation-play-state: paused; /* Pause animation on hover */
+            animation-play-state: paused; /* Pause animation on hover/touch */
         }
 
         /* Starfield Styles */
@@ -202,8 +203,9 @@
         /* Hero starfield initially hidden, fades in on scroll */
         #starfield-hero {
             opacity: 0;
-            transition: opacity 0.3s ease-in-out; /* Faster fade for immediate feel */
-            z-index: 1; /* Above dark overlay, below hero content */
+            /* Default transition will be set by JS for fade-out. 
+               Fade-in transition is handled by JS on scroll start. */
+            z-index: 1; /* Above dark overlay, below hero content wrapper */
         }
 
 
@@ -263,6 +265,10 @@
             position: relative; 
             z-index: 1; 
         }
+        .event-card-artistic:hover::before,
+        .event-card-artistic.js-touch-active::before { /* Added touch class */
+            opacity: 1;
+        }
         .event-card-artistic::before {
             content: "";
             position: absolute;
@@ -275,13 +281,11 @@
             transition: opacity 0.35s ease;
         }
 
-        .event-card-artistic:hover {
+        .event-card-artistic:hover,
+        .event-card-artistic.js-touch-active { /* Added touch class */
             transform: translateY(-10px) scale(1.02);
             box-shadow: 0 0 25px var(--neon-blue-transparent-medium), 0 10px 30px rgba(0,0,0,0.5);
             border-color: var(--neon-blue-transparent-medium);
-        }
-        .event-card-artistic:hover::before {
-            opacity: 1;
         }
 
 
@@ -312,7 +316,8 @@
             box-shadow: 0 0 12px var(--neon-blue-transparent-heavy), 0 0 20px var(--neon-blue-transparent-medium);
             transition: background-color 0.3s ease, box-shadow 0.3s ease, color 0.3s ease;
         }
-        .event-card-artistic:hover .event-item .time-highlight-art {
+        .event-card-artistic:hover .event-item .time-highlight-art,
+        .event-card-artistic.js-touch-active .event-item .time-highlight-art { /* Added touch class */
             background-color: #fff;
             color: var(--neon-blue);
             box-shadow: 0 0 15px #fff, 0 0 25px var(--neon-blue-transparent-medium);
@@ -349,7 +354,8 @@
             border: 1px solid #2a3445;
             transition: background-color 0.3s ease, transform 0.2s ease, color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease;
         }
-        .participant-list-artistic li:hover {
+        .participant-list-artistic li:hover,
+        .participant-list-artistic li.js-touch-active { /* Added touch class */
             background-color: var(--card-bg);
             transform: translateY(-2px);
             color: var(--neon-blue);
@@ -373,7 +379,7 @@
             border: 1px solid var(--neon-blue);
         }
 
-        .btn-primary:hover {
+        .btn-primary:hover { /* No touch class needed for buttons as click is the primary interaction */
             background-color: #fff;
             color: var(--neon-blue);
             transform: translateY(-4px) scale(1.03);
@@ -539,7 +545,7 @@
     <script>
         document.getElementById('currentYear').textContent = new Date().getFullYear();
 
-        // Starfield Generation and Parallax Logic
+        // Starfield Generation Logic
         function createStars(containerId, count, options = {}) {
             const container = document.getElementById(containerId);
             if (!container) return;
@@ -574,7 +580,6 @@
         const heroStarfieldContainer = document.getElementById('starfield-hero');
         if (heroStarfieldContainer) {
             const heroStars = heroStarfieldContainer.querySelectorAll('.star');
-            let starsVisible = false;
             let scrollTimeout; // Variable to hold the timeout ID
 
             window.addEventListener('scroll', () => {
@@ -583,11 +588,9 @@
                 // Clear any existing timeout to prevent premature fade-out if user continues scrolling
                 clearTimeout(scrollTimeout);
 
-                // Show stars immediately on any scroll
-                if (!starsVisible) {
-                    heroStarfieldContainer.style.opacity = '1';
-                    starsVisible = true;
-                }
+                // Show stars: Set fast fade-in and opacity to 1
+                heroStarfieldContainer.style.transition = 'opacity 0.2s ease-in'; // Fast fade-in
+                heroStarfieldContainer.style.opacity = '1';
                 
                 // Apply falling effect
                 heroStars.forEach(star => {
@@ -599,13 +602,47 @@
 
                 // Set a timeout to fade out stars if scrolling stops
                 scrollTimeout = setTimeout(() => {
-                    if (starsVisible) { // Only fade out if they are currently visible
-                        heroStarfieldContainer.style.opacity = '0';
-                        starsVisible = false;
-                    }
-                }, 1500); // 1.5 seconds of inactivity
-            });
+                    heroStarfieldContainer.style.transition = 'opacity 1.5s ease-out'; // Slower fade-out
+                    heroStarfieldContainer.style.opacity = '0';
+                }, 100); // 100ms of inactivity before fade-out starts
+            }, { passive: true }); // Use passive listener for scroll for better performance
         }
+
+        // Touch handling for hover effects on mobile
+        document.addEventListener('DOMContentLoaded', () => {
+            const touchHoverElements = document.querySelectorAll(
+                '.event-card-artistic, .participant-list-artistic li, .avidan-illustration-stylized'
+            );
+
+            touchHoverElements.forEach(el => {
+                el.addEventListener('touchstart', function(e) {
+                    // Remove class from any other element that might have it
+                    touchHoverElements.forEach(otherEl => {
+                        if (otherEl !== this) {
+                            otherEl.classList.remove('js-touch-active');
+                        }
+                    });
+                    this.classList.add('js-touch-active');
+                }, { passive: true });
+            });
+
+            document.addEventListener('touchstart', function(e) {
+                let targetElement = e.target;
+                let isInteractive = false;
+                
+                touchHoverElements.forEach(interactiveEl => {
+                    if (interactiveEl.contains(targetElement)) {
+                        isInteractive = true;
+                    }
+                });
+
+                if (!isInteractive) {
+                    touchHoverElements.forEach(el => {
+                        el.classList.remove('js-touch-active');
+                    });
+                }
+            }, { passive: true });
+        });
     </script>
 </body>
 </html>
